@@ -14,5 +14,5 @@ class MainPage(webapp2.RequestHandler):
         self.response.headers['Content-Type'] = 'text/plain'
         # self.response.write('Hello, World! Please bear with me for a little while I get this up and running')
         template = JINJA_ENVIRONMENT.get_template('index.html')
-        logging.info(dir(template))
-        self.response.write(template)
+        # logging.info(dir(template))
+        self.response.write(template.render(greeting="Hello World!"))
