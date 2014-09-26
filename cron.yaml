@@ -1,0 +1,4 @@
+cron:
+- description: daily summary job
+  url: /cron/fetch_stats/<tag>
+  schedule: every 24 hours
