@@ -197,14 +197,33 @@ class fisherclassifier(classifier):
     return best
 
 
+# def sampletrain(cl):
+#     cl.train('I love this car', 'positive')
+#     cl.train('This view is amazing', 'positive')
+#     cl.train('I feel great this morning', 'positive')
+#     cl.train('I am so excited about the concert', 'positive')
+#     cl.train('He is my best friend', 'positive')
+#     cl.train('I do not like this car', 'negative')
+#     cl.train('This view is horrible', 'negative')
+#     cl.train('I feel tired this morning', 'negative')
+#     cl.train('I am not looking forward to the concert', 'negative')
+#     cl.train('He is my enemy', 'negative')
+
 def sampletrain(cl):
-    cl.train('I love this car', 'positive')
-    cl.train('This view is amazing', 'positive')
-    cl.train('I feel great this morning', 'positive')
-    cl.train('I am so excited about the concert', 'positive')
-    cl.train('He is my best friend', 'positive')
-    cl.train('I do not like this car', 'negative')
-    cl.train('This view is horrible', 'negative')
-    cl.train('I feel tired this morning', 'negative')
-    cl.train('I am not looking forward to the concert', 'negative')
-    cl.train('He is my enemy', 'negative')
+  with open('sent_train1.txt','r') as s1:
+    for line in s1.readlines():
+      cl.train(process_line(line))
+
+  
+
+      # print type(line), len(line), type(line[0])
+      # print process_line(line)
+
+def process_line(line):
+  sent=None
+  category=None
+  if line:
+    category = 'postitive' if line[0]== '0' else 'negative'
+    sent = line[2:-2].strip()
+  return sent,category
+
