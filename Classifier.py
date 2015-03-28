@@ -1,16 +1,27 @@
 from sqlite3 import dbapi2 as sqlite
 import re
 import math
+import csv
+from nltk import FreqDist
+from nltk.corpus import stopwords
+import nltk
+# nltk.download()
+import xlrd
 
 def getwords(doc):
-  splitter=re.compile('\\W*')
-  print doc
+  # splitter=re.compile('\\W*')
+  # print doc
+
   # Split the words by non-alpha characters
-  words=[s.lower() for s in splitter.split(doc) 
-          if len(s)>2 and len(s)<20]
+  engstop = stopwords.words('english')
+  # print engstop
+  words =[]
+  if not isinstance(doc,int):
+    words=[s.lower() for s in doc.split(" ") if s.lower() not in engstop]
   
   # Return the unique set of words only
-  return dict([(w,1) for w in words])
+  # return dict([(w,1) for w in words])
+  return words
 
 class classifier:
   def __init__(self,getfeatures,filename=None):
@@ -209,21 +220,135 @@ class fisherclassifier(classifier):
 #     cl.train('I am not looking forward to the concert', 'negative')
 #     cl.train('He is my enemy', 'negative')
 
-def sampletrain(cl):
-  with open('sent_train1.txt','r') as s1:
-    for line in s1.readlines():
-      cl.train(process_line(line))
+# def sampletrain(cl):
+#   with open('sent_train1.txt','r') as s1:
+#     for line in s1.readlines():
+#       cl.train(process_line(line))
 
   
 
-      # print type(line), len(line), type(line[0])
-      # print process_line(line)
+#       # print type(line), len(line), type(line[0])
+#       print process_line(line)
 
 def process_line(line):
   sent=None
   category=None
   if line:
-    category = 'postitive' if line[0]== '0' else 'negative'
-    sent = line[2:-2].strip()
+    category = 'postitive' if line[4].value== 1 else 'negative'
+    sent = line[0].value.strip()
   return sent,category
 
+# sampletrain
+
+# class Semanticizer
+# def semanticize(sent):
+#   words=sent.split(" ")
+#   
+def calculate_probs(dct):
+  total = 0.0
+  for item in dct.keys():
+    total+=dct[item]
+
+  for item in dct.keys():
+    dct[item] = dct[item]/total
+
+  return dct
+def categorize():
+  with open('newdata.csv') as cs:
+    reader = csv.DictReader(cs)
+    dct={}
+    for row in reader:
+      dct[row['brandname']]=dct.get(row['brandname'],{})
+      for key in row.keys():
+        dct[row['brandname']][key] = {}
+  with open('newdata.csv') as cs:
+    reader = csv.DictReader(cs)
+    for row in reader:
+      dct[row['brandname']]['features'][row['features']]=dct[row['brandname']]['features'].get(row['features'],0)+1
+      dct[row['brandname']]['speakers'][row['speakers']]=dct[row['brandname']]['speakers'].get(row['speakers'],0)+1
+      dct[row['brandname']]['processor'][row['processor']]=dct[row['brandname']]['processor'].get(row['processor'],0)+1
+      dct[row['brandname']]['application'][row['application']]=dct[row['brandname']]['application'].get(row['application'],0)+1
+      dct[row['brandname']]['screen'][row['screen']]=dct[row['brandname']]['screen'].get(row['screen'],0)+1
+      dct[row['brandname']]['ram'][row['ram']]=dct[row['brandname']]['ram'].get(row['ram'],0)+1
+      # dct[row['brandname']]['sno'][row['sno']]=dct[row['brandname']]['sno'].get(row['sno'],0)+1
+      dct[row['brandname']]['classpreference'][row['classpreference']]=dct[row['brandname']]['classpreference'].get(row['classpreference'],0)+1
+      dct[row['brandname']]['resolution'][row['resolution']]=dct[row['brandname']]['resolution'].get(row['resolution'],0)+1
+      dct[row['brandname']]['hardware'][row['hardware']]=dct[row['brandname']]['hardware'].get(row['hardware'],0)+1
+      dct[row['brandname']]['battery'][row['battery']]=dct[row['brandname']]['battery'].get(row['battery'],0)+1
+      dct[row['brandname']]['memory'][row['memory']]=dct[row['brandname']]['memory'].get(row['memory'],0)+1
+      dct[row['brandname']]['os'][row['os']]=dct[row['brandname']]['os'].get(row['os'],0)+1
+    # print dct
+    nudct=dct.copy()
+    # print nudct
+    for key in nudct.keys():
+      item = nudct[key]
+      # print key
+      for i in item.keys():
+        # print i,key,nudct[key][i]
+        item[i] = calculate_probs(item[i])
+
+    # print nudct
+    # return nudct
+
+      # dct[row['brandname']][row['resolution']]=dct[row['brandname']].get(row['resolution'],0)+1
+      # dct[row['brandname']][row['camera']]=dct[row['brandname']].get(row['camera'],0)+1
+    # print dct
+      # print row['os']
+      # while row['brandname'] == reader.next()['brandname']:
+      #   print row['brandname']
+    # print dir(reader)
+    # print reader.next()
+    # print reader.next()
+    # print reader.next()
+
+
+# categorize()
+
+def sampletrain():
+  worksheet = open_worksheet('nusents.xlsx','Sheet1')
+  num_rows = worksheet.nrows - 1
+  words=[]
+  curr_row = -1
+  while curr_row < num_rows:
+    curr_row += 1
+    row = worksheet.row(curr_row)
+    print process_line(row)
+
+
+
+def open_worksheet(workbook,worksheet):
+  workbook = xlrd.open_workbook(workbook)
+  worksheet = workbook.sheet_by_name(worksheet)
+  return worksheet
+
+def semanticize(brandname):
+  worksheet = open_worksheet('nusents.xlsx','nusents')
+  num_rows = worksheet.nrows - 1
+  words=[]
+  curr_row = -1
+  while curr_row < num_rows:
+    curr_row += 1
+    row = worksheet.row(curr_row)
+    # print row[1].value
+    if row[1].value == brandname:
+      words.extend(getwords(row[0].value))
+      # print process_line(row)
+  
+  fdist = FreqDist(words)
+  vocab = fdist.keys()
+  print vocab[0:200]
+  # print words
+
+# semanticize('nokia')
+# semanticize('lg')
+# semanticize('sony')
+# semanticize('samsung')
+# semanticize('tecno')
+
+NOKIA = ['lumia', '928', '920', 'windows', '900','microsoft', '925','nokia']
+LG = ['optimus', 'android', 'lg']
+SONY = ['xperia', 'android', 'z', 'x10', 'z2', 'z1']
+SAMSUNG = ['galaxy', 'android', 's4', 's3', 'tablet']
+TECNO = ['phantom', 'p3', '1000', 'n3', 'm5']
+
+sampletrain()

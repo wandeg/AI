@@ -10,9 +10,12 @@ JINJA_ENVIRONMENT = jinja2.Environment(
     autoescape=True)
 logging.info(dir(ai))
 class MainPage(webapp2.RequestHandler):
-    def get(self):
-        self.response.headers['Content-Type'] = 'text/plain'
-        # self.response.write('Hello, World! Please bear with me for a little while I get this up and running')
-        template = JINJA_ENVIRONMENT.get_template('index.html')
-        # logging.info(dir(template))
-        self.response.write(template.render(greeting="Hello World!"))
+	def jinja2(self):
+		return jinja2.get_jinja2(factory=jinja2_factory)
+
+	def get(self):
+	    self.response.headers['Content-Type'] = 'text/plain'
+	    # self.response.write('Hello, World! Please bear with me for a little while I get this up and running')
+	    template = JINJA_ENVIRONMENT.get_template('index.html')
+	    # logging.info(dir(template))
+	    self.response.write(self.jinja2.render_template(greeting="Hello World!"))
