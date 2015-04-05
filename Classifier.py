@@ -7,6 +7,7 @@ from nltk.corpus import stopwords
 import nltk
 # nltk.download()
 import xlrd
+from brands import *
 
 def getwords(doc):
   # splitter=re.compile('\\W*')
@@ -244,65 +245,8 @@ def process_line(line):
 # def semanticize(sent):
 #   words=sent.split(" ")
 #   
-def calculate_probs(dct):
-  total = 0.0
-  for item in dct.keys():
-    total+=dct[item]
-
-  for item in dct.keys():
-    dct[item] = dct[item]/total
-
-  return dct
-def categorize():
-  with open('newdata.csv') as cs:
-    reader = csv.DictReader(cs)
-    dct={}
-    for row in reader:
-      dct[row['brandname']]=dct.get(row['brandname'],{})
-      for key in row.keys():
-        dct[row['brandname']][key] = {}
-  with open('newdata.csv') as cs:
-    reader = csv.DictReader(cs)
-    for row in reader:
-      dct[row['brandname']]['features'][row['features']]=dct[row['brandname']]['features'].get(row['features'],0)+1
-      dct[row['brandname']]['speakers'][row['speakers']]=dct[row['brandname']]['speakers'].get(row['speakers'],0)+1
-      dct[row['brandname']]['processor'][row['processor']]=dct[row['brandname']]['processor'].get(row['processor'],0)+1
-      dct[row['brandname']]['application'][row['application']]=dct[row['brandname']]['application'].get(row['application'],0)+1
-      dct[row['brandname']]['screen'][row['screen']]=dct[row['brandname']]['screen'].get(row['screen'],0)+1
-      dct[row['brandname']]['ram'][row['ram']]=dct[row['brandname']]['ram'].get(row['ram'],0)+1
-      # dct[row['brandname']]['sno'][row['sno']]=dct[row['brandname']]['sno'].get(row['sno'],0)+1
-      dct[row['brandname']]['classpreference'][row['classpreference']]=dct[row['brandname']]['classpreference'].get(row['classpreference'],0)+1
-      dct[row['brandname']]['resolution'][row['resolution']]=dct[row['brandname']]['resolution'].get(row['resolution'],0)+1
-      dct[row['brandname']]['hardware'][row['hardware']]=dct[row['brandname']]['hardware'].get(row['hardware'],0)+1
-      dct[row['brandname']]['battery'][row['battery']]=dct[row['brandname']]['battery'].get(row['battery'],0)+1
-      dct[row['brandname']]['memory'][row['memory']]=dct[row['brandname']]['memory'].get(row['memory'],0)+1
-      dct[row['brandname']]['os'][row['os']]=dct[row['brandname']]['os'].get(row['os'],0)+1
-    # print dct
-    nudct=dct.copy()
-    # print nudct
-    for key in nudct.keys():
-      item = nudct[key]
-      # print key
-      for i in item.keys():
-        # print i,key,nudct[key][i]
-        item[i] = calculate_probs(item[i])
-
-    # print nudct
-    # return nudct
-
-      # dct[row['brandname']][row['resolution']]=dct[row['brandname']].get(row['resolution'],0)+1
-      # dct[row['brandname']][row['camera']]=dct[row['brandname']].get(row['camera'],0)+1
-    # print dct
-      # print row['os']
-      # while row['brandname'] == reader.next()['brandname']:
-      #   print row['brandname']
-    # print dir(reader)
-    # print reader.next()
-    # print reader.next()
-    # print reader.next()
 
 
-# categorize()
 
 def sampletrain():
   worksheet = open_worksheet('nusents.xlsx','Sheet1')
@@ -345,10 +289,37 @@ def semanticize(brandname):
 # semanticize('samsung')
 # semanticize('tecno')
 
-NOKIA = ['lumia', '928', '920', 'windows', '900','microsoft', '925','nokia']
-LG = ['optimus', 'android', 'lg']
-SONY = ['xperia', 'android', 'z', 'x10', 'z2', 'z1']
-SAMSUNG = ['galaxy', 'android', 's4', 's3', 'tablet']
-TECNO = ['phantom', 'p3', '1000', 'n3', 'm5']
+# NOKIA = ['lumia', '928', '920', 'windows', '900','microsoft', '925','nokia']
+# LG = ['optimus', 'android', 'lg']
+# SONY = ['xperia', 'android', 'z', 'x10', 'z2', 'z1']
+# SAMSUNG = ['galaxy', 'android', 's4', 's3', 'tablet']
+# TECNO = ['phantom', 'p3', '1000', 'n3', 'm5']
 
-sampletrain()
+# sampletrain()
+
+# def summarize(dataset):
+#   print zip(*dataset)
+#   summaries = [(mean(attribute), stdev(attribute)) for attribute in zip(*dataset)]
+#   del summaries[-1]
+#   return summaries
+# dataset = [[1,20,0], [2,21,1], [3,22,0]]
+# summary = summarize(dataset)
+# print('Attribute summaries: {0}').format(summary)
+# # summarize()
+
+def predict_brand(statement):
+  highest=0
+  brand=None
+  for k,v in BRANDS.items():
+    a=set(statement)
+    b=set(v['values'])
+    inter=a.intersection(b)
+    if len(inter) > highest:
+      highest=len(inter)
+      brand=k
+
+  return brand
+
+# from brands import *
+# for k,v in BRANDS.items():
+#   print k, v['values']
