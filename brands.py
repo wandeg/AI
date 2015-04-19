@@ -752,3 +752,11 @@ BRANDS={
         ]
     }
 }
+
+MAPPER = {
+      'nokia':'2',
+      'samsung':'3',
+      'sony':'4',
+      'lg':'1',
+      'tecno':'5'
+}

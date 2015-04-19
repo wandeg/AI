@@ -8,6 +8,7 @@ import nltk
 # nltk.download()
 import xlrd
 from brands import *
+from featureprobs import *
 
 def getwords(doc):
   # splitter=re.compile('\\W*')
@@ -39,6 +40,7 @@ class classifier:
 
 
   def incf(self,f,cat):
+    # Increase number of times feature appears in category
     count=self.fcount(f,cat)
     if count==0:
       self.con.execute("insert into fc values ('%s','%s',1)" 
@@ -49,6 +51,7 @@ class classifier:
         % (count+1,f,cat)) 
   
   def fcount(self,f,cat):
+    # return how many times feature appears in category
     res=self.con.execute(
       'select count from fc where feature="%s" and category="%s"'
       %(f,cat)).fetchone()
@@ -56,6 +59,7 @@ class classifier:
     else: return float(res[0])
 
   def incc(self,cat):
+    #increase number of items in category
     count=self.catcount(cat)
     if count==0:
       self.con.execute("insert into cc values ('%s',1)" % (cat))
@@ -64,6 +68,7 @@ class classifier:
                        % (count+1,cat))    
 
   def catcount(self,cat):
+    #Returns how many items are in this category
     res=self.con.execute('select count from cc where category="%s"'
                          %(cat)).fetchone()
     if res==None: return 0
@@ -126,8 +131,8 @@ class naivebayes(classifier):
     return p
 
   def prob(self,item,cat):
-    catprob=self.catcount(cat)/self.totalcount()
-    docprob=self.docprob(item,cat)
+    catprob=self.catcount(cat)/self.totalcount() #P(category)
+    docprob=self.docprob(item,cat) # P(document|category)
     return docprob*catprob
   
   def setthreshold(self,cat,t):
@@ -153,60 +158,7 @@ class naivebayes(classifier):
       if probs[cat]*self.getthreshold(best)>probs[best]: return default
     return best
 
-class fisherclassifier(classifier):
-  def cprob(self,f,cat):
-    # The frequency of this feature in this category    
-    clf=self.fprob(f,cat)
-    if clf==0: return 0
 
-    # The frequency of this feature in all the categories
-    freqsum=sum([self.fprob(f,c) for c in self.categories()])
-
-    # The probability is the frequency in this category divided by
-    # the overall frequency
-    p=clf/(freqsum)
-    
-    return p
-  def fisherprob(self,item,cat):
-    # Multiply all the probabilities together
-    p=1
-    features=self.getfeatures(item)
-    for f in features:
-      p*=(self.weightedprob(f,cat,self.cprob))
-
-    # Take the natural log and multiply by -2
-    fscore=-2*math.log(p)
-
-    # Use the inverse chi2 function to get a probability
-    return self.invchi2(fscore,len(features)*2)
-  def invchi2(self,chi, df):
-    m = chi / 2.0
-    sum = term = math.exp(-m)
-    for i in range(1, df//2):
-        term *= m / i
-        sum += term
-    return min(sum, 1.0)
-  def __init__(self,getfeatures):
-    classifier.__init__(self,getfeatures)
-    self.minimums={}
-
-  def setminimum(self,cat,min):
-    self.minimums[cat]=min
-  
-  def getminimum(self,cat):
-    if cat not in self.minimums: return 0
-    return self.minimums[cat]
-  def classify(self,item,default=None):
-    # Loop through looking for the best result
-    best=default
-    max=0.0
-    for c in self.categories():
-      p=self.fisherprob(item,c)
-      # Make sure it exceeds its minimum
-      if p>self.getminimum(c) and p>max:
-        best=c
-        max=p
-    return best
 
 
 # def sampletrain(cl):
@@ -307,19 +259,46 @@ def semanticize(brandname):
 # print('Attribute summaries: {0}').format(summary)
 # # summarize()
 
+def get_similar_words(s1,s2):
+  a=set(s1)
+  b=set(s2)
+  inter = a.intersection(b)
+  return list(inter)
+
+
 def predict_brand(statement):
   highest=0
   brand=None
   for k,v in BRANDS.items():
-    a=set(statement)
-    b=set(v['values'])
-    inter=a.intersection(b)
+    a=getwords(statement)
+    b=[s.lower() for s in v['values']]
+    inter=get_similar_words(a,b)
     if len(inter) > highest:
       highest=len(inter)
       brand=k
 
   return brand
 
+def predict_sentiment(cl, statement, brand):
+  prior_pos = 0
+  prior_neg = 0
+  print brand
+  mapped = MAPPER[brand]
+  print mapped
+  class_priors = FEATPROBS[mapped]["classpreference"]
+  print class_priors
+  print FEATPROBS[mapped].keys(), statement
+  a=FEATPROBS[mapped].keys()
+  b=statement.split(" ")
+  sim = get_similar_words(a,b)
+  print sim
+  # if len(sim):
+
+
+
 # from brands import *
 # for k,v in BRANDS.items():
 #   print k, v['values']
+stm = 'nokia lumia xperia compact ultra 3250 evolve z os ram'
+br = predict_brand(stm)
+predict_sentiment(None,stm, br)
