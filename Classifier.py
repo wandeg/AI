@@ -280,19 +280,25 @@ def predict_brand(statement):
   return brand
 
 def predict_sentiment(cl, statement, brand):
-  prior_pos = 0
-  prior_neg = 0
+  prior_pos = 1
+  prior_mod = 1
+  prior_neg = 1
   print brand
   mapped = MAPPER[brand]
   print mapped
-  class_priors = FEATPROBS[mapped]["classpreference"]
+  brand = FEATPROBS[mapped]
+  class_priors = brand["classpreference"]
   print class_priors
-  print FEATPROBS[mapped].keys(), statement
-  a=FEATPROBS[mapped].keys()
+  print brand.keys(), statement
+  a=brand.keys()
   b=statement.split(" ")
   sim = get_similar_words(a,b)
   print sim
-  # if len(sim):
+  if len(sim):
+    for i in sim:
+      if i != 'os':
+        print brand[i]
+
 
 
 

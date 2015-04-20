@@ -3,6 +3,7 @@ from bs4 import BeautifulSoup
 import json
 import string
 import csv
+from decimal import *
 
 
 url_dct={'lg':{'url':"http://www.esato.com/phones/by-LG?p=1",'values':[]},
@@ -14,15 +15,29 @@ url_dct={'lg':{'url':"http://www.esato.com/phones/by-LG?p=1",'values':[]},
 def remove_punctuation(s):
 	return s.translate(string.maketrans("",""),string.punctuation)
 
-def calculate_probs(dct):
-  total = 0.0
-  for item in dct.keys():
-    total+=dct[item]
+def calculate_probs(dct, use_all=False):
+	total = 0.0
+	
+	ideal = ['1','2','3']
+	if not use_all:
+		ideal = ['1','2']
+	for item in dct.keys():
+		total+=dct[item]
+	# print dct
 
-  for item in dct.keys():
-    dct[item] = dct[item]/total
 
-  return dct
+
+	keys = dct.keys()
+	not_in = [item for item in ideal if item not in keys]
+	for i in not_in:
+		dct[i] = 0
+
+	for item in dct.keys():
+		if total > 0:
+		    dct[item] = (dct[item]+1)/(total+len(ideal))
+
+
+	return dct
 
 def get_brands():
 # url=URLS[0]
@@ -125,16 +140,16 @@ def categorize():
     # print nudct
     for key in nudct.keys():
       item = nudct[key]
-      # print key
+      # print key, item
       for i in item.keys():
-        # print i,key,nudct[key][i]
-        item[i] = calculate_probs(item[i])
+        print i,key,nudct[key][i]
+        item[i] = calculate_probs(item[i], i != 'os')
 
     with open('featureprobs.py','wb') as b:
 		b.write("FEATPROBS=")
 		b.write(json.dumps(nudct, indent=4))
 
-    print nudct
+    # print nudct
     return nudct
 
       # dct[row['brandname']][row['resolution']]=dct[row['brandname']].get(row['resolution'],0)+1
