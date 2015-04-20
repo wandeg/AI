@@ -5,6 +5,7 @@ import csv
 from nltk import FreqDist
 from nltk.corpus import stopwords
 import nltk
+import operator
 # nltk.download()
 import xlrd
 from brands import *
@@ -283,21 +284,27 @@ def predict_sentiment(cl, statement, brand):
   prior_pos = 1
   prior_mod = 1
   prior_neg = 1
-  print brand
+  # print brand
   mapped = MAPPER[brand]
-  print mapped
+  # print mapped
   brand = FEATPROBS[mapped]
   class_priors = brand["classpreference"]
   print class_priors
-  print brand.keys(), statement
+  # print brand.keys(), statement
   a=brand.keys()
   b=statement.split(" ")
   sim = get_similar_words(a,b)
-  print sim
+  # print sim
   if len(sim):
     for i in sim:
       if i != 'os':
-        print brand[i]
+        vals = brand[i]
+        print vals
+        for key in vals.keys():
+          if key in class_priors:
+            class_priors[key] *= vals[key]
+  print class_priors
+  print max(class_priors.iteritems(), key=operator.itemgetter(1))[0]
 
 
 
