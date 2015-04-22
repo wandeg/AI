@@ -42,6 +42,7 @@ class classifier:
   def incf(self,f,cat):
     # Increase number of times feature appears in category
     count=self.fcount(f,cat)
+    # print count
     if count==0:
       self.con.execute("insert into fc values ('%s','%s',1)" 
                        % (f,cat))
@@ -61,6 +62,7 @@ class classifier:
   def incc(self,cat):
     #increase number of items in category
     count=self.catcount(cat)
+    # print count
     if count==0:
       self.con.execute("insert into cc values ('%s',1)" % (cat))
     else:
@@ -86,6 +88,7 @@ class classifier:
 
   def train(self,item,cat):
     features=self.getfeatures(item)
+    print features
     # Increment the count for every feature with this category
     for f in features:
       self.incf(f,cat)
@@ -145,17 +148,21 @@ class naivebayes(classifier):
   def classify(self,item,default=None):
     probs={}
     # Find the category with the highest probability
-    max=0.0
+    best = None
+    highest=0.0
+    # print self.categories()
     for cat in self.categories():
+      # print cat
       probs[cat]=self.prob(item,cat)
-      if probs[cat]>max: 
-        max=probs[cat]
+      if probs[cat]>highest: 
+        highest=probs[cat]
+        print highest
         best=cat
 
     # Make sure the probability exceeds threshold*next best
-    for cat in probs:
-      if cat==best: continue
-      if probs[cat]*self.getthreshold(best)>probs[best]: return default
+    # for cat in probs:
+    #   if cat==best: continue
+    #   if probs[cat]*self.getthreshold(best)>probs[best]: return default
     return best
 
 
@@ -184,11 +191,14 @@ class naivebayes(classifier):
 #       print process_line(line)
 
 def process_line(line):
+  # print line, len(line)
   sent=None
   category=None
-  if line:
+  if line and len(line) >=5:
+    # print line[4].value
     category = 'postitive' if line[4].value== 1 else 'negative'
     sent = line[0].value.strip()
+    print sent,category
   return sent,category
 
 # sampletrain
@@ -200,7 +210,7 @@ def process_line(line):
 
 
 
-def sampletrain():
+def sampletrain(cl):
   worksheet = open_worksheet('nusents.xlsx','Sheet1')
   num_rows = worksheet.nrows - 1
   words=[]
@@ -208,8 +218,14 @@ def sampletrain():
   while curr_row < num_rows:
     curr_row += 1
     row = worksheet.row(curr_row)
-    print process_line(row)
-
+    try:
+      a,b = process_line(row)
+      # print a,b
+      if a and b:
+        cl.train(a,b)
+    except Exception, e:
+      pass
+    
 
 
 def open_worksheet(workbook,worksheet):
@@ -299,12 +315,50 @@ def predict_sentiment(cl, statement, brand):
       if i != 'os':
         print brand[i]
 
-
+def test(value, expected):
+  mapper = {'positive':1, 'negative': -1}
+  actual = mapper[value]
+  return actual == int(expected)
 
 
 # from brands import *
 # for k,v in BRANDS.items():
 #   print k, v['values']
-stm = 'nokia lumia xperia compact ultra 3250 evolve z os ram'
-br = predict_brand(stm)
-predict_sentiment(None,stm, br)
+# stm = 'nokia lumia xperia compact ultra 3250 evolve z os ram'
+# br = predict_brand(stm)
+# predict_sentiment(None,stm, br)
+cl = naivebayes(getwords)
+cl.setdb('test1.db')
+# sampletrain(cl)
+# print cl.classify("nokia lumia ")
+
+worksheet = open_worksheet('nusents.xlsx','Sheet1')
+num_rows = worksheet.nrows - 1
+words=[]
+curr_row = 0
+num_tru =0
+num_false =0
+while curr_row < num_rows:
+  curr_row += 1
+  row = worksheet.row(curr_row)
+  try:
+    text = row[0].value
+    exp = row[4].value
+    val = cl.classify(text)
+    # print val, text, exp
+    pasd = test(val, exp)
+    if pasd:
+      num_tru +=1
+    else:
+      num_false +=1
+    # break
+    # print a,b
+    # if a and b:
+    #   cl.train(a,b)
+    print curr_row
+    if curr_row ==20:
+      break
+  except Exception, e:
+    pass
+
+print num_tru, num_false
