@@ -1,5 +1,7 @@
+import itertools
 from sqlite3 import dbapi2 as sqlite
 import re
+import os
 import math
 import csv
 from nltk import FreqDist
@@ -10,6 +12,15 @@ import operator
 import xlrd
 from brands import *
 from featureprobs import *
+
+from flask import Flask, render_template, request, redirect, jsonify, url_for
+
+app = Flask(__name__)
+from werkzeug import secure_filename
+
+UPLOAD_FOLDER = './uploads'
+ALLOWED_EXTENSIONS = set(['txt','csv'])
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 def getwords(doc):
   # splitter=re.compile('\\W*')
@@ -151,130 +162,39 @@ class naivebayes(classifier):
     # Find the category with the highest probability
     best = None
     highest=0.0
+    total = 0.0
     # print self.categories()
     for cat in self.categories():
       # print cat
       probs[cat]=self.prob(item,cat)
+      total+=probs[cat]
       if probs[cat]>highest: 
         highest=probs[cat]
         print highest
         best=cat
 
-    # Make sure the probability exceeds threshold*next best
-    # for cat in probs:
-    #   if cat==best: continue
-    #   if probs[cat]*self.getthreshold(best)>probs[best]: return default
-    return best
+    ideal = ['1','2','3']
 
+    for item in ideal:
+        if total > 0:
+            probs[item] = (probs.get(item,0)+1)/(total+len(ideal))
+    return best, probs
 
-
-
-# def sampletrain(cl):
-#     cl.train('I love this car', 'positive')
-#     cl.train('This view is amazing', 'positive')
-#     cl.train('I feel great this morning', 'positive')
-#     cl.train('I am so excited about the concert', 'positive')
-#     cl.train('He is my best friend', 'positive')
-#     cl.train('I do not like this car', 'negative')
-#     cl.train('This view is horrible', 'negative')
-#     cl.train('I feel tired this morning', 'negative')
-#     cl.train('I am not looking forward to the concert', 'negative')
-#     cl.train('He is my enemy', 'negative')
-
-# def sampletrain(cl):
-#   with open('sent_train1.txt','r') as s1:
-#     for line in s1.readlines():
-#       cl.train(process_line(line))
-
-  
-
-#       # print type(line), len(line), type(line[0])
-#       print process_line(line)
 
 def process_line(line):
   # print line, len(line)
   sent=None
   category=None
   if line and len(line) >=5:
-    # print line[4].value
-    category = 'postitive' if line[4].value== 1 else 'negative'
+    category = '3' if line[4].value== 1 else '1'
     sent = line[0].value.strip()
-    print sent,category
   return sent,category
-
-# sampletrain
-
-# class Semanticizer
-# def semanticize(sent):
-#   words=sent.split(" ")
-#   
-
-
-
-def sampletrain(cl):
-  worksheet = open_worksheet('nusents.xlsx','Sheet1')
-  num_rows = worksheet.nrows - 1
-  words=[]
-  curr_row = -1
-  while curr_row < num_rows:
-    curr_row += 1
-    row = worksheet.row(curr_row)
-    try:
-      a,b = process_line(row)
-      # print a,b
-      if a and b:
-        cl.train(a,b)
-    except Exception, e:
-      pass
-    
 
 
 def open_worksheet(workbook,worksheet):
   workbook = xlrd.open_workbook(workbook)
   worksheet = workbook.sheet_by_name(worksheet)
   return worksheet
-
-def semanticize(brandname):
-  worksheet = open_worksheet('nusents.xlsx','nusents')
-  num_rows = worksheet.nrows - 1
-  words=[]
-  curr_row = -1
-  while curr_row < num_rows:
-    curr_row += 1
-    row = worksheet.row(curr_row)
-    # print row[1].value
-    if row[1].value == brandname:
-      words.extend(getwords(row[0].value))
-      # print process_line(row)
-  
-  fdist = FreqDist(words)
-  vocab = fdist.keys()
-  print vocab[0:200]
-  # print words
-
-# semanticize('nokia')
-# semanticize('lg')
-# semanticize('sony')
-# semanticize('samsung')
-# semanticize('tecno')
-
-# NOKIA = ['lumia', '928', '920', 'windows', '900','microsoft', '925','nokia']
-# LG = ['optimus', 'android', 'lg']
-# SONY = ['xperia', 'android', 'z', 'x10', 'z2', 'z1']
-# SAMSUNG = ['galaxy', 'android', 's4', 's3', 'tablet']
-# TECNO = ['phantom', 'p3', '1000', 'n3', 'm5']
-
-# sampletrain()
-
-# def summarize(dataset):
-#   print zip(*dataset)
-#   summaries = [(mean(attribute), stdev(attribute)) for attribute in zip(*dataset)]
-#   del summaries[-1]
-#   return summaries
-# dataset = [[1,20,0], [2,21,1], [3,22,0]]
-# summary = summarize(dataset)
-# print('Attribute summaries: {0}').format(summary)
-# # summarize()
 
 def get_similar_words(s1,s2):
   a=set(s1)
@@ -296,76 +216,81 @@ def predict_brand(statement):
 
   return brand
 
+def most_common(lst):
+    return max(set(lst), key=lst.count)
+
 def predict_sentiment(cl, statement, brand):
-  prior_pos = 1
-  prior_mod = 1
-  prior_neg = 1
-  # print brand
   mapped = MAPPER[brand]
-  # print mapped
+  total = 1
   brand = FEATPROBS[mapped]
   class_priors = brand["classpreference"]
-  print class_priors
-  # print brand.keys(), statement
+  classed = cl.classify(statement)
   a=brand.keys()
   b=statement.split(" ")
   sim = get_similar_words(a,b)
-  # print sim
-  if len(sim):
-    for i in sim:
-      if i != 'os':
-        vals = brand[i]
-        print vals
-        for key in vals.keys():
-          if key in class_priors:
-            class_priors[key] *= vals[key]
-  print class_priors
-  print max(class_priors.iteritems(), key=operator.itemgetter(1))[0]
+  total = len(sim) 
+  mc = None
+  high_prior = max(class_priors.iteritems(), key=operator.itemgetter(1))[0]
+  high_classed = classed[0]
+  if total >0:
+    var = [item for item in itertools.combinations_with_replacement('123', total)]
+    probs=[]
+    for v in var:
+      pr=[]
+      val = 0
+      ct=1
+      for i in range(len(sim)):
+        if sim[i]!= 'os':
+          ct+=1
+          val += brand[sim[i]][v[i]]
+          val+=class_priors[v[i]]
+          ct+=1
+      val /= ct
+      # pr.append(val)
+      probs.append(val)
+
+    idx = probs.index(max(probs))
+    mc = most_common(list(var[idx]))
+    if probs[idx] > classed[1][high_classed]:
+      return mc
+    else:
+      return high_classed
+  else:
+    return high_classed
+
 
 def test(value, expected):
   mapper = {'positive':1, 'negative': -1}
   actual = mapper[value]
   return actual == int(expected)
 
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1] in ALLOWED_EXTENSIONS
 
-# from brands import *
-# for k,v in BRANDS.items():
-#   print k, v['values']
-# stm = 'nokia lumia xperia compact ultra 3250 evolve z os ram'
-# br = predict_brand(stm)
-# predict_sentiment(None,stm, br)
-cl = naivebayes(getwords)
-cl.setdb('test1.db')
-# sampletrain(cl)
-# print cl.classify("nokia lumia ")
-
-worksheet = open_worksheet('nusents.xlsx','Sheet1')
-num_rows = worksheet.nrows - 1
-words=[]
-curr_row = 0
-num_tru =0
-num_false =0
-while curr_row < num_rows:
-  curr_row += 1
-  row = worksheet.row(curr_row)
-  try:
-    text = row[0].value
-    exp = row[4].value
-    val = cl.classify(text)
-    # print val, text, exp
-    pasd = test(val, exp)
-    if pasd:
-      num_tru +=1
+@app.route('/postsent', methods=['POST'])
+def postSentiment():
+  cl = naivebayes(getwords)
+  cl.setdb('test1.db')
+  ans = ""
+  if request.method == 'POST':
+    file = request.files['file']
+    if file and allowed_file(file.filename):
+        filename = secure_filename(file.filename)
+        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
     else:
-      num_false +=1
-    # break
-    # print a,b
-    # if a and b:
-    #   cl.train(a,b)
-    print curr_row
-    if curr_row ==20:
-      break
-  except Exception, e:
-    pass
+      sent = request.form.get('sent')
+      if sent:
+        brand = predict_brand(sent)
+        if brand:
+          val = predict_sentiment(cl,sent,brand)
+        else:
+          val = cl.classify(sent)[0]
+        ans = "The classified value for statement %s is %s" %(sent,CLASS_MAPPER[val])
+  return render_template('output.html', output = ans)
 
-print num_tru, num_false
+@app.route('/')
+def main():
+  return render_template('index.html')
+
+if __name__ == '__main__':
+    app.run(debug=True)

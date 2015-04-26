@@ -406,3 +406,8 @@ FEATPROBS={
         }
     }
 }
+
+CLASS_MAPPER = {
+'1':'awful',
+'2': 'moderate',
+'3': 'good'}
