@@ -267,25 +267,40 @@ def test(value, expected):
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1] in ALLOWED_EXTENSIONS
 
-@app.route('/postsent', methods=['POST'])
-def postSentiment():
+def get_sent(sent):
   cl = naivebayes(getwords)
   cl.setdb('test1.db')
-  ans = ""
+  brand = predict_brand(sent)
+  if brand:
+    val = predict_sentiment(cl,sent,brand)
+  else:
+    val = cl.classify(sent)[0]
+  return "The classified value for  %s is %s" %(sent,CLASS_MAPPER[val])
+
+
+@app.route('/postsent', methods=['POST'])
+def postSentiment():
+  
+  ans = []
   if request.method == 'POST':
-    file = request.files['file']
-    if file and allowed_file(file.filename):
-        filename = secure_filename(file.filename)
-        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+    fil = request.files['file']
+    print dir(fil), type(fil)
+    if fil and allowed_file(fil.filename):
+        filename = secure_filename(fil.filename)
+        fil.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+        # print 
+        # print dir(fil.stream)
+        # print fil.stream.read()
+        # print [f for f in fil.stream.readlines()]
+        with open(os.path.join(app.config['UPLOAD_FOLDER'], filename),'r') as f:
+          for l in f.readlines():
+            ans.append(get_sent(l))
+
     else:
       sent = request.form.get('sent')
       if sent:
-        brand = predict_brand(sent)
-        if brand:
-          val = predict_sentiment(cl,sent,brand)
-        else:
-          val = cl.classify(sent)[0]
-        ans = "The classified value for statement %s is %s" %(sent,CLASS_MAPPER[val])
+        ans.append(get_sent(sent))
+    print ans
   return render_template('output.html', output = ans)
 
 @app.route('/')

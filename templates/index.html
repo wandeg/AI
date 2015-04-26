@@ -1,14 +1,9 @@
-<!DOCTYPE html>
-{% autoescape true %}
-<html>
-	<head>
-		<link type="text/css" rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}" />
-		
-	</head>
-	<body>
-		<form name="sentiment_input_form" action="/postsent" method="POST" enctype="multipart/form-data">
+{% extends "base.html" %}
+
+{% block content %}
+<h1 class="cover-heading">Enter Sentiment.</h1>
+           <form name="sentiment_input_form" action="/postsent" method="POST" enctype="multipart/form-data">
 			<div class="form-group">
-			    <label for="sent">Enter Sentiment</label>
 			    <input type="text" class="form-control" name="sent" id="sent" placeholder="Enter sentiment">
 			</div>
 			<p>OR </p>
@@ -16,8 +11,6 @@
 			    <label for="sentfile">Upload File</label>
 			    <input type="file" name="file" id="sentfile">
 			  </div>
-			<input type="submit">
+			<input type="submit" class="btn btn-primary">
 				</form>
-	</body>
-</html>
-{% endautoescape %}
+{% endblock %}

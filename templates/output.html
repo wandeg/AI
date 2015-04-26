@@ -1,13 +1,15 @@
-<!DOCTYPE html>
-<html>
-<head>
-	<title></title>
-</head>
-<body>
-<a href="/">Home</a>
-	{% if output %}
-	  <p>{{ output }}!</p>
-	{% endif %}
-</body>
-</html>
+{% extends "base.html" %}
+{% block nav %}
+	<a href="/">Home</a>
+{% endblock %} 
+
+{% block content %}
+{% if output %}
+	{% for a in output %}
+	  <p>{{ a }}!</p>
+	{% endfor %}
+{% endif %}
+
+{% endblock %}
+	
 
