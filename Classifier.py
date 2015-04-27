@@ -196,6 +196,24 @@ def open_worksheet(workbook,worksheet):
   worksheet = workbook.sheet_by_name(worksheet)
   return worksheet
 
+def sampletrain(cl):
+  worksheet = open_worksheet('nusents.xlsx','Sheet1')
+  num_rows = worksheet.nrows - 1
+  words=[]
+  while curr_row < num_rows:
+    curr_row += 1
+    row = worksheet.row(curr_row)
+    print process_line(row)
+
+    try:
+      a,b = process_line(row)
+      # print a,b
+      if a and b:
+        cl.train(a,b)
+    except Exception, e:
+      pass
+    
+
 def get_similar_words(s1,s2):
   a=set(s1)
   b=set(s2)
@@ -270,6 +288,7 @@ def allowed_file(filename):
 def get_sent(sent):
   cl = naivebayes(getwords)
   cl.setdb('test1.db')
+  sampletrain(cl)
   brand = predict_brand(sent)
   if brand:
     val = predict_sentiment(cl,sent,brand)
