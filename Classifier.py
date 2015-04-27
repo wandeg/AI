@@ -200,6 +200,7 @@ def sampletrain(cl):
   worksheet = open_worksheet('nusents.xlsx','Sheet1')
   num_rows = worksheet.nrows - 1
   words=[]
+  curr_row = -1
   while curr_row < num_rows:
     curr_row += 1
     row = worksheet.row(curr_row)
@@ -288,7 +289,7 @@ def allowed_file(filename):
 def get_sent(sent):
   cl = naivebayes(getwords)
   cl.setdb('test1.db')
-  sampletrain(cl)
+  # sampletrain(cl)
   brand = predict_brand(sent)
   if brand:
     val = predict_sentiment(cl,sent,brand)
