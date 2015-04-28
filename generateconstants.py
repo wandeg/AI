@@ -33,8 +33,8 @@ def calculate_probs(dct, use_all=False):
 		dct[i] = 0
 
 	for item in dct.keys():
-		if total > 0:
-		    dct[item] = (dct[item]+1)/(total+len(ideal))
+		# if total > 0:
+	    dct[item] = (dct[item]+1)/(total+len(ideal))
 
 
 	return dct

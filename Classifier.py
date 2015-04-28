@@ -22,6 +22,11 @@ UPLOAD_FOLDER = './uploads'
 ALLOWED_EXTENSIONS = set(['txt','csv'])
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
+CLASS_MAPPER = {
+'1':'awful',
+'2': 'moderate',
+'3': 'good'}
+
 def getwords(doc):
   # splitter=re.compile('\\W*')
   # print doc
@@ -238,44 +243,61 @@ def predict_brand(statement):
 def most_common(lst):
     return max(set(lst), key=lst.count)
 
+def map_keys(dct):
+  dc = {}
+  for k,v in dct.items():
+    dc[CLASS_MAPPER[k]] = v
+  return dc
+
+
 def predict_sentiment(cl, statement, brand):
   mapped = MAPPER[brand]
   total = 1
   brand = FEATPROBS[mapped]
-  class_priors = brand["classpreference"]
-  classed = cl.classify(statement)
+  classed, probs = cl.classify(statement)
   a=brand.keys()
   b=statement.split(" ")
   sim = get_similar_words(a,b)
   total = len(sim) 
   mc = None
-  high_prior = max(class_priors.iteritems(), key=operator.itemgetter(1))[0]
-  high_classed = classed[0]
-  if total >0:
-    var = [item for item in itertools.combinations_with_replacement('123', total)]
-    probs=[]
-    for v in var:
-      pr=[]
-      val = 0
-      ct=1
-      for i in range(len(sim)):
-        if sim[i]!= 'os':
-          ct+=1
-          val += brand[sim[i]][v[i]]
-          val+=class_priors[v[i]]
-          ct+=1
-      val /= ct
-      # pr.append(val)
-      probs.append(val)
+  used_probs={}
+  used_probs['priors']=map_keys(probs.copy())
+  # if total >0:
+  #   var = [item for item in itertools.combinations_with_replacement('123', total)]
+  #   probs=[]
+  #   for v in var:
+  #     pr=[]
+  #     val = 0
+  #     ct=1
+  #     for i in range(len(sim)):
+  #       if sim[i]!= 'os':
+  #         ct+=1
+  #         val *= brand[sim[i]][v[i]]
+  #         ct+=1
+  #     val /= ct
+  #     # pr.append(val)
+  #     probs.append(val)
 
-    idx = probs.index(max(probs))
-    mc = most_common(list(var[idx]))
-    if probs[idx] > classed[1][high_classed]:
-      return mc
-    else:
-      return high_classed
+  #   idx = probs.index(max(probs))
+  #   mc = most_common(list(var[idx]))
+  #   if probs[idx] > classed[1][high_classed]:
+  #     return mc
+  #   else:
+  #     return high_classed
+  if total >0:
+    for k,v in probs.items():
+      for i in range(len(sim)):
+        if sim[i] != 'os':
+          probs[k] *=brand[sim[i]][k]
+    for i in range(len(sim)):
+      used_probs[sim[i]] = map_keys(brand[sim[i]])
+    tot = sum(probs.values())
+    for k,v in probs.items():
+      probs[k] = v*100.0/tot
+    return max(probs.iteritems(), key=operator.itemgetter(1))[0], used_probs
+
   else:
-    return high_classed
+    return classed, used_probs
 
 
 def test(value, expected):
@@ -292,10 +314,12 @@ def get_sent(sent):
   # sampletrain(cl)
   brand = predict_brand(sent)
   if brand:
-    val = predict_sentiment(cl,sent,brand)
+    val, probs = predict_sentiment(cl,sent,brand)
   else:
-    val = cl.classify(sent)[0]
-  return "The classified value for  %s is %s" %(sent,CLASS_MAPPER[val])
+    val, probs = cl.classify(sent)
+  probs['brand'] = brand
+  probs['class'] = CLASS_MAPPER[val]
+  return sent, probs
 
 
 @app.route('/postsent', methods=['POST'])
@@ -304,7 +328,6 @@ def postSentiment():
   ans = []
   if request.method == 'POST':
     fil = request.files['file']
-    print dir(fil), type(fil)
     if fil and allowed_file(fil.filename):
         filename = secure_filename(fil.filename)
         fil.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
@@ -314,12 +337,14 @@ def postSentiment():
         # print [f for f in fil.stream.readlines()]
         with open(os.path.join(app.config['UPLOAD_FOLDER'], filename),'r') as f:
           for l in f.readlines():
-            ans.append(get_sent(l))
+            a,b = get_sent(l)
+            ans.append([a,b])
 
     else:
       sent = request.form.get('sent')
       if sent:
-        ans.append(get_sent(sent))
+        a,b = get_sent(sent)
+        ans.append([a,b])
     print ans
   return render_template('output.html', output = ans)
 

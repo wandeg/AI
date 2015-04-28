@@ -5,9 +5,31 @@
 
 {% block content %}
 {% if output %}
+<table class="table">
 	{% for a in output %}
-	  <p>{{ a }}!</p>
+		<tr>
+		  <td>
+		  {{ a[0]|tojson|safe }}
+		  </td>
+		  {% for item,value in a[1].items() %}
+			{% set a = item %}
+			{% set b = value %}
+			<td>
+			{{ a|tojson|safe }}
+			{% if b is mapping %}
+				{% for item,value in b.items() %}
+					{{ item|tojson|safe }}:{{ value|tojson|safe }} 
+				{% endfor %}
+			{% else %}
+				{{ b|tojson|safe }}
+			{% endif %}
+			</td>
+			{% endfor %}
+
+	</tr>
 	{% endfor %}
+</table>
+	
 {% endif %}
 
 {% endblock %}
