@@ -15,11 +15,8 @@
 			{% set a = item %}
 			{% set b = value %}
 			<td>
-			{% if a == 'priors' or a =='brand' or a =='class'%}
+			{% if a == 'posteriors' or a =='brand' or a =='class' or a =='priors'%}
 			{{ a|tojson|safe }}
-			{% else %}
-			Posterior - {{ a|tojson|safe }}
-			{% endif %}
 			
 			{% if b is mapping %}
 				{% for item,value in b.items() %}
@@ -27,6 +24,7 @@
 				{% endfor %}
 			{% else %}
 				 {{ b|tojson|safe }}
+			{% endif %}
 			{% endif %}
 			</td>
 			{% endfor %}

@@ -163,27 +163,27 @@ class naivebayes(classifier):
     return self.thresholds[cat]
   
   def classify(self,item,default=None):
-    probs={}
+    class_probs={}
     # Find the category with the highest probability
-    best = None
+    best_class = None
     highest=0.0
     total = 0.0
-    # print self.categories()
+    print self.categories()
     for cat in self.categories():
-      # print cat
-      probs[cat]=self.prob(item,cat)
-      total+=probs[cat]
-      if probs[cat]>highest: 
-        highest=probs[cat]
+      print cat
+      class_probs[cat]=self.prob(item,cat)
+      total+=class_probs[cat]
+      if class_probs[cat]>highest: 
+        highest=class_probs[cat]
         print highest
-        best=cat
+        best_class=cat
 
     ideal = ['1','2','3']
 
     for item in ideal:
         if total > 0:
-            probs[item] = (probs.get(item,0)+1)/(total+len(ideal))
-    return best, probs
+            class_probs[item] = (class_probs.get(item,0)+1)/(total+len(ideal))
+    return best_class, class_probs
 
 
 def process_line(line):
@@ -243,25 +243,29 @@ def predict_brand(statement):
 def most_common(lst):
     return max(set(lst), key=lst.count)
 
-def map_keys(dct):
+def rename_keys(dct):
+  """
+  Returns a dict where all category integers have been renamed 
+  to their human readable values
+  """
   dc = {}
   for k,v in dct.items():
     dc[CLASS_MAPPER[k]] = v
   return dc
 
 
-def predict_sentiment(cl, statement, brand):
-  mapped = MAPPER[brand]
+def predict_sentiment(cl, statement, brand_id):
+  brand_name = MAPPER[brand_id]
   total = 1
-  brand = FEATPROBS[mapped]
+  brand_data = FEATPROBS[brand_name]
   classed, probs = cl.classify(statement)
-  a=brand.keys()
+  a=brand_data.keys()
   b=statement.split(" ")
   sim = get_similar_words(a,b)
   total = len(sim) 
   mc = None
   used_probs={}
-  used_probs['priors']=map_keys(probs.copy())
+  used_probs['posteriors']=rename_keys(probs.copy())
   # if total >0:
   #   var = [item for item in itertools.combinations_with_replacement('123', total)]
   #   probs=[]
@@ -288,12 +292,14 @@ def predict_sentiment(cl, statement, brand):
     for k,v in probs.items():
       for i in range(len(sim)):
         if sim[i] != 'os':
-          probs[k] *=brand[sim[i]][k]
+          probs[k] *=brand_data[sim[i]][k]
     for i in range(len(sim)):
-      used_probs[sim[i]] = map_keys(brand[sim[i]])
+      used_probs[sim[i]] = rename_keys(brand_data[sim[i]])
     tot = sum(probs.values())
     for k,v in probs.items():
-      probs[k] = v*100.0/tot
+      probs[k] = v/tot
+    print probs, 'last'
+    used_probs['priors'] = rename_keys(probs)
     return max(probs.iteritems(), key=operator.itemgetter(1))[0], used_probs
 
   else:
@@ -314,11 +320,13 @@ def get_sent(sent):
   # sampletrain(cl)
   brand = predict_brand(sent)
   if brand:
-    val, probs = predict_sentiment(cl,sent,brand)
+    cat, probs = predict_sentiment(cl,sent,brand)
+    probs['brand'] = brand
   else:
-    val, probs = cl.classify(sent)
-  probs['brand'] = brand
-  probs['class'] = CLASS_MAPPER[val]
+    cat, probs = cl.classify(sent)
+  print cat, probs
+  cl.train(sent,cat)
+  probs['class'] = CLASS_MAPPER[cat]
   return sent, probs
 
 
