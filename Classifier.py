@@ -12,6 +12,7 @@ import operator
 import xlrd
 from brands import *
 from featureprobs import *
+from pylab import figure, pie, savefig, axes, title
 
 from flask import Flask, render_template, request, redirect, jsonify, url_for
 
@@ -119,19 +120,21 @@ class classifier:
 
     # The total number of times this feature appeared in this 
     # category divided by the total number of items in this category
+    # print self.fcount(f,cat),f,cat
     return self.fcount(f,cat)/self.catcount(cat)
 
   def weightedprob(self,f,cat,prf,weight=1.0,ap=0.5):
     # Calculate current probability
     basicprob=prf(f,cat)
-
+    print f,basicprob, cat
     # Count the number of times this feature has appeared in
     # all categories
     totals=sum([self.fcount(f,c) for c in self.categories()])
+    # print f,totals
 
     # Calculate the weighted average
     bp=((weight*ap)+(totals*basicprob))/(weight+totals)
-    return bp
+    return basicprob
 
 
 
@@ -144,7 +147,6 @@ class naivebayes(classifier):
   
   def docprob(self,item,cat):
     features=self.getfeatures(item)   
-
     # Multiply the probabilities of all the features together
     p=1
     for f in features: p*=self.weightedprob(f,cat,self.fprob)
@@ -153,6 +155,7 @@ class naivebayes(classifier):
   def prob(self,item,cat):
     catprob=self.catcount(cat)/self.totalcount() #P(category)
     docprob=self.docprob(item,cat) # P(document|category)
+    # print docprob,catprob
     return docprob*catprob
   
   def setthreshold(self,cat,t):
@@ -168,21 +171,21 @@ class naivebayes(classifier):
     best_class = None
     highest=0.0
     total = 0.0
-    print self.categories()
+    # print self.categories()
     for cat in self.categories():
-      print cat
+      # print cat
       class_probs[cat]=self.prob(item,cat)
       total+=class_probs[cat]
       if class_probs[cat]>highest: 
         highest=class_probs[cat]
-        print highest
+        # print highest
         best_class=cat
-
+    # print class_probs, best_class
     ideal = ['1','2','3']
 
-    for item in ideal:
-        if total > 0:
-            class_probs[item] = (class_probs.get(item,0)+1)/(total+len(ideal))
+    # for item in ideal:
+    #     if total > 0:
+    #         class_probs[item] = (class_probs.get(item,0)+1)/(total+len(ideal))
     return best_class, class_probs
 
 
@@ -209,7 +212,7 @@ def sampletrain(cl):
   while curr_row < num_rows:
     curr_row += 1
     row = worksheet.row(curr_row)
-    print process_line(row)
+    # print process_line(row)
 
     try:
       a,b = process_line(row)
@@ -219,6 +222,21 @@ def sampletrain(cl):
     except Exception, e:
       pass
     
+def sampletrain2(cl):
+  with open('full_training_dataset.csv') as f:
+    reader = csv.reader(f)
+    for row in reader:
+      try:
+        a = row[1].strip()
+        if row[0] == 'positive':
+          b = '3'
+        elif row[0] == 'negative':
+          b = '1'
+        elif row [0] == 'neutral':
+          b = '2'
+        cl.train(a,b)
+      except Exception, e:
+        pass
 
 def get_similar_words(s1,s2):
   a=set(s1)
@@ -258,6 +276,7 @@ def predict_sentiment(cl, statement, brand_id):
   brand_name = MAPPER[brand_id]
   total = 1
   brand_data = FEATPROBS[brand_name]
+  print statement
   classed, probs = cl.classify(statement)
   a=brand_data.keys()
   b=statement.split(" ")
@@ -265,7 +284,12 @@ def predict_sentiment(cl, statement, brand_id):
   total = len(sim) 
   mc = None
   used_probs={}
-  used_probs['posteriors']=rename_keys(probs.copy())
+  print probs, classed
+  pr = {}
+  for cat in cl.categories():
+    pr[cat] = cl.catcount(cat)/cl.totalcount()
+  used_probs['priors']=rename_keys(pr.copy())
+
   # if total >0:
   #   var = [item for item in itertools.combinations_with_replacement('123', total)]
   #   probs=[]
@@ -296,13 +320,14 @@ def predict_sentiment(cl, statement, brand_id):
     for i in range(len(sim)):
       used_probs[sim[i]] = rename_keys(brand_data[sim[i]])
     tot = sum(probs.values())
-    for k,v in probs.items():
-      probs[k] = v/tot
-    print probs, 'last'
-    used_probs['priors'] = rename_keys(probs)
+    # for k,v in probs.items():
+    #   probs[k] = v/tot
+    # print probs, 'last'
+    used_probs['posteriors'] = rename_keys(probs)
     return max(probs.iteritems(), key=operator.itemgetter(1))[0], used_probs
 
   else:
+    used_probs['posteriors'] = rename_keys(probs)
     return classed, used_probs
 
 
@@ -318,17 +343,45 @@ def get_sent(sent):
   cl = naivebayes(getwords)
   cl.setdb('test1.db')
   # sampletrain(cl)
+  # sampletrain2(cl)
   brand = predict_brand(sent)
   if brand:
     cat, probs = predict_sentiment(cl,sent,brand)
     probs['brand'] = brand
   else:
-    cat, probs = cl.classify(sent)
+    probs = {}
+    cat, p = cl.classify(sent)
+    probs['brand'] = 'None'
+    pr = {}
+    for cat in cl.categories():
+      pr[cat] = cl.catcount(cat)/cl.totalcount()
+      probs['priors' ]= rename_keys(pr.copy())
+    probs['posteriors'] = rename_keys(p)
   print cat, probs
   cl.train(sent,cat)
-  probs['class'] = CLASS_MAPPER[cat]
-  return sent, probs
+  probs['statement'] = sent
+  best = max(probs['posteriors'].iteritems(), key=operator.itemgetter(1))[0]
+  probs['class'] = best
+  probs['best'] = probs['posteriors'][best]
+  return probs
 
+def to_percent(dct):
+  for k,v in dct.items():
+    dct[k] = v*100
+  return dct
+
+def plot(item,i):
+  figure(i, figsize=(8,8))
+  its = sorted(item['classprefs'].items(),key=lambda x:x[0])
+  # print its
+  fracs=[int(i[1]) for i in its]
+  mylabels=['good', 'awful', 'neutral']
+
+  mycolors=['green','red','blue']
+  pie(fracs,labels=mylabels,colors=mycolors,autopct='%.2f')
+  # print [item['brand'],fracs,mylabels,mycolors]
+  title(item['brand'])
+  savefig(item['brand'])
 
 @app.route('/postsent', methods=['POST'])
 def postSentiment():
@@ -345,16 +398,25 @@ def postSentiment():
         # print [f for f in fil.stream.readlines()]
         with open(os.path.join(app.config['UPLOAD_FOLDER'], filename),'r') as f:
           for l in f.readlines():
-            a,b = get_sent(l)
-            ans.append([a,b])
+            a = get_sent(l)
+            ans.append(a)
 
     else:
       sent = request.form.get('sent')
       if sent:
-        a,b = get_sent(sent)
-        ans.append([a,b])
-    print ans
-  return render_template('output.html', output = ans)
+        a = get_sent(sent)
+        ans.append(a)
+    # print ans
+    data=[]
+    for k,v in MAPPER.items():
+      data.append({'brand':k, 'classprefs':to_percent(FEATPROBS[v]['classpreference'])})
+    # print data
+    i=1
+    for item in data:
+      plot(item,i)
+      i+=1
+      
+  return render_template('output.html', output = ans, datas=data)
 
 @app.route('/')
 def main():

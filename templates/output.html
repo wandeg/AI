@@ -5,36 +5,30 @@
 
 {% block content %}
 {% if output %}
-<table class="table">
-	{% for a in output %}
+	<table class="table">
 		<tr>
-		  <td>
-		  {{ a[0]|tojson|safe }}
-		  </td>
-		  {% for item,value in a[1].items() %}
-			{% set a = item %}
-			{% set b = value %}
-			<td>
-			{% if a == 'posteriors' or a =='brand' or a =='class' or a =='priors'%}
-			{{ a|tojson|safe }}
-			
-			{% if b is mapping %}
-				{% for item,value in b.items() %}
-					{{ item|tojson|safe }}:{{ value|tojson|safe }} 
-				{% endfor %}
-			{% else %}
-				 {{ b|tojson|safe }}
-			{% endif %}
-			{% endif %}
-			</td>
-			{% endfor %}
+			<td>Statement</td>
+			<td>Brand</td>
+			<td>Prior Probability</td>
+			<td>Posterior Probability</td>
+			<td>Class</td>
 
-	</tr>
-	{% endfor %}
-</table>
+		</tr>
+			{% for o in output %}
+				<tr>
+				  {% set pr = o %}
+					<td>{{pr.statement}}</td>
+					<td>{{pr.brand}}</td>
+					<td>{{pr.priors.items() | pprint}}</td>
+					<td>{{pr.posteriors.items() | pprint}}</td>
+					<td>{{pr.class}} : {{pr.best}}</td>
+					
+			</tr>
+			{% endfor %}
+	</table>
 	
 {% endif %}
 
 {% endblock %}
-	
+
 
