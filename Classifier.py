@@ -24,9 +24,14 @@ ALLOWED_EXTENSIONS = set(['txt','csv'])
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 CLASS_MAPPER = {
-'1':'awful',
+'1':'bad',
 '2': 'moderate',
 '3': 'good'}
+
+to_db = {
+'1':'negative',
+'2': 'moderate',
+'3': 'postitive'}
 
 def getwords(doc):
   # splitter=re.compile('\\W*')
@@ -103,10 +108,14 @@ class classifier:
     if res==None: return 0
     return res[0]
 
+  def totalvocab(self):
+    res=self.con.execute('select sum(count) from fc').fetchone();
+    if res==None: return 0
+    return res[0]
+
 
   def train(self,item,cat):
     features=self.getfeatures(item)
-    print features
     # Increment the count for every feature with this category
     for f in features:
       self.incf(f,cat)
@@ -121,12 +130,11 @@ class classifier:
     # The total number of times this feature appeared in this 
     # category divided by the total number of items in this category
     # print self.fcount(f,cat),f,cat
-    return self.fcount(f,cat)/self.catcount(cat)
+    return (self.fcount(f,cat)+1)/(self.catcount(cat)+self.totalvocab())
 
   def weightedprob(self,f,cat,prf,weight=1.0,ap=0.5):
     # Calculate current probability
     basicprob=prf(f,cat)
-    print f,basicprob, cat
     # Count the number of times this feature has appeared in
     # all categories
     totals=sum([self.fcount(f,c) for c in self.categories()])
@@ -153,7 +161,7 @@ class naivebayes(classifier):
     return p
 
   def prob(self,item,cat):
-    catprob=self.catcount(cat)/self.totalcount() #P(category)
+    catprob=(self.catcount(cat)+1)/(self.totalcount()+self.totalvocab()) #P(category)
     docprob=self.docprob(item,cat) # P(document|category)
     # print docprob,catprob
     return docprob*catprob
@@ -173,19 +181,19 @@ class naivebayes(classifier):
     total = 0.0
     # print self.categories()
     for cat in self.categories():
-      # print cat
+      print cat
       class_probs[cat]=self.prob(item,cat)
       total+=class_probs[cat]
       if class_probs[cat]>highest: 
         highest=class_probs[cat]
         # print highest
         best_class=cat
-    # print class_probs, best_class
-    ideal = ['1','2','3']
-
-    # for item in ideal:
-    #     if total > 0:
-    #         class_probs[item] = (class_probs.get(item,0)+1)/(total+len(ideal))
+    print class_probs, best_class
+    ideal = ['negative','neutral','postitive']
+    # print class_probs
+    for item in ideal:
+        if total > 0:
+            class_probs[item] = (class_probs.get(item,0)+1)/(total+self.totalvocab())
     return best_class, class_probs
 
 
@@ -268,6 +276,12 @@ def rename_keys(dct):
   """
   dc = {}
   for k,v in dct.items():
+    if k == 'postitive':
+      k='3'
+    elif k == 'negative':
+      k='1'
+    elif k == 'neutral':
+      k='2'
     dc[CLASS_MAPPER[k]] = v
   return dc
 
@@ -276,7 +290,6 @@ def predict_sentiment(cl, statement, brand_id):
   brand_name = MAPPER[brand_id]
   total = 1
   brand_data = FEATPROBS[brand_name]
-  print statement
   classed, probs = cl.classify(statement)
   a=brand_data.keys()
   b=statement.split(" ")
@@ -284,10 +297,9 @@ def predict_sentiment(cl, statement, brand_id):
   total = len(sim) 
   mc = None
   used_probs={}
-  print probs, classed
   pr = {}
   for cat in cl.categories():
-    pr[cat] = cl.catcount(cat)/cl.totalcount()
+    pr[cat] = (cl.catcount(cat)+1)/(cl.totalcount()+cl.totalvocab())
   used_probs['priors']=rename_keys(pr.copy())
 
   # if total >0:
@@ -316,7 +328,22 @@ def predict_sentiment(cl, statement, brand_id):
     for k,v in probs.items():
       for i in range(len(sim)):
         if sim[i] != 'os':
+          if k == 'postitive':
+            probs['3']=probs['postitive']
+            del probs['postitive']
+            k='3'
+          elif k == 'negative':
+            probs['1']=probs['negative']
+            del probs['negative']
+            k='1'
+          elif k == 'neutral':
+            probs['2']=probs['neutral']
+            del probs['neutral']
+            k='2'
+            # print probs
+          # print brand_data[sim[i]]
           probs[k] *=brand_data[sim[i]][k]
+      # print probs
     for i in range(len(sim)):
       used_probs[sim[i]] = rename_keys(brand_data[sim[i]])
     tot = sum(probs.values())
@@ -357,8 +384,7 @@ def get_sent(sent):
       pr[cat] = cl.catcount(cat)/cl.totalcount()
       probs['priors' ]= rename_keys(pr.copy())
     probs['posteriors'] = rename_keys(p)
-  print cat, probs
-  cl.train(sent,cat)
+  cl.train(sent,to_db[cat])
   probs['statement'] = sent
   best = max(probs['posteriors'].iteritems(), key=operator.itemgetter(1))[0]
   probs['class'] = best
@@ -375,7 +401,7 @@ def plot(item,i):
   its = sorted(item['classprefs'].items(),key=lambda x:x[0])
   # print its
   fracs=[int(i[1]) for i in its]
-  mylabels=['good', 'awful', 'neutral']
+  mylabels=['good', 'bad', 'moderate']
 
   mycolors=['green','red','blue']
   pie(fracs,labels=mylabels,colors=mycolors,autopct='%.2f')
@@ -423,4 +449,4 @@ def main():
   return render_template('index.html')
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, port=50000)
