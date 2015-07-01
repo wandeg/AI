@@ -384,7 +384,7 @@ def get_sent(sent):
       pr[cat] = cl.catcount(cat)/cl.totalcount()
       probs['priors' ]= rename_keys(pr.copy())
     probs['posteriors'] = rename_keys(p)
-  cl.train(sent,to_db[cat])
+  cl.train(sent,cat)
   probs['statement'] = sent
   best = max(probs['posteriors'].iteritems(), key=operator.itemgetter(1))[0]
   probs['class'] = best
