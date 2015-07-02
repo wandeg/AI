@@ -179,22 +179,30 @@ class naivebayes(classifier):
     best_class = None
     highest=0.0
     total = 0.0
+    temp = {}
     # print self.categories()
     for cat in self.categories():
-      print cat
+      print 'cat is', cat
       class_probs[cat]=self.prob(item,cat)
       total+=class_probs[cat]
       if class_probs[cat]>highest: 
         highest=class_probs[cat]
         # print highest
         best_class=cat
-    print class_probs, best_class
+    # print class_probs, best_class
     ideal = ['negative','neutral','postitive']
-    # print class_probs
+    print class_probs
     for item in ideal:
         if total > 0:
             class_probs[item] = (class_probs.get(item,0)+1)/(total+self.totalvocab())
-    return best_class, class_probs
+    # for key in class_probs.keys():
+    if '3' in class_probs and 'postitive' in class_probs:
+      temp['postitive'] = class_probs['postitive'] * class_probs['3']
+    if '1' in class_probs and 'negative' in class_probs:
+      temp['negative'] = class_probs['negative'] * class_probs['1']
+    if '2' in class_probs and 'neutral' in class_probs:
+      temp['neutral'] = class_probs['neutral'] * class_probs['2']
+    return best_class, temp
 
 
 def process_line(line):
@@ -301,6 +309,9 @@ def predict_sentiment(cl, statement, brand_id):
   for cat in cl.categories():
     pr[cat] = (cl.catcount(cat)+1)/(cl.totalcount()+cl.totalvocab())
   used_probs['priors']=rename_keys(pr.copy())
+  print "using brand"
+  print used_probs
+  print probs
 
   # if total >0:
   #   var = [item for item in itertools.combinations_with_replacement('123', total)]
@@ -324,26 +335,40 @@ def predict_sentiment(cl, statement, brand_id):
   #     return mc
   #   else:
   #     return high_classed
+  # print probs
   if total >0:
     for k,v in probs.items():
       for i in range(len(sim)):
         if sim[i] != 'os':
           if k == 'postitive':
-            probs['3']=probs['postitive']
+            print probs
+            if '3' in probs:
+              probs['3']*=probs['postitive']
+            else:
+              probs['3']=probs['postitive']
             del probs['postitive']
+            print probs
             k='3'
+            probs[k] *=brand_data[sim[i]][k]
           elif k == 'negative':
-            probs['1']=probs['negative']
+            if '1' in probs:
+              probs['1']*=probs['negative']
+            else:
+              probs['1']=probs['negative']
             del probs['negative']
             k='1'
+            probs[k] *=brand_data[sim[i]][k]
           elif k == 'neutral':
-            probs['2']=probs['neutral']
+            if '2' in probs:
+              probs['2']*=probs['neutral']
+            else:
+              probs['2']=probs['neutral']
             del probs['neutral']
             k='2'
             # print probs
           # print brand_data[sim[i]]
-          probs[k] *=brand_data[sim[i]][k]
-      # print probs
+            probs[k] *=brand_data[sim[i]][k]
+    print probs
     for i in range(len(sim)):
       used_probs[sim[i]] = rename_keys(brand_data[sim[i]])
     tot = sum(probs.values())
