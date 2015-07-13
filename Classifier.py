@@ -60,6 +60,7 @@ class classifier:
     self.con=sqlite.connect(dbfile)    
     self.con.execute('create table if not exists fc(feature,category,count)')
     self.con.execute('create table if not exists cc(category,count)')
+    self.con.execute('create table if not exists brands(name,postitive,negative,moderate)')
 
 
   def incf(self,f,cat):
@@ -138,20 +139,23 @@ class classifier:
     # Count the number of times this feature has appeared in
     # all categories
     totals=sum([self.fcount(f,c) for c in self.categories()])
-    # print f,totals
-
-    # Calculate the weighted average
-    bp=((weight*ap)+(totals*basicprob))/(weight+totals)
     return basicprob
 
+  def initialize_brands(self):
+  self.con=sqlite.connect(dbfile)
+  self.con.execute('create table if not exists brands(name,postitive,negative,moderate)')
+  for k,v in MAPPER.items():
+      data.append({'brand':k, 'classprefs':to_percent(FEATPROBS[v]['classpreference'])})
 
+  for item in data:
+    self.con.execute("insert into brands values (%s,%s,%s,%s)" 
+      %(item['brand'],item['classprefs']['3'],item['classprefs']['1'],item['classprefs']['2']))
 
 
 class naivebayes(classifier):
   
   def __init__(self,getfeatures):
     classifier.__init__(self,getfeatures)
-    self.thresholds={}
   
   def docprob(self,item,cat):
     features=self.getfeatures(item)   
@@ -166,13 +170,6 @@ class naivebayes(classifier):
     # print docprob,catprob
     return docprob*catprob
   
-  def setthreshold(self,cat,t):
-    self.thresholds[cat]=t
-    
-  def getthreshold(self,cat):
-    if cat not in self.thresholds: return 1.0
-    return self.thresholds[cat]
-  
   def classify(self,item,default=None):
     class_probs={}
     # Find the category with the highest probability
@@ -180,9 +177,7 @@ class naivebayes(classifier):
     highest=0.0
     total = 0.0
     temp = {}
-    # print self.categories()
     for cat in self.categories():
-      print 'cat is', cat
       class_probs[cat]=self.prob(item,cat)
       total+=class_probs[cat]
       if class_probs[cat]>highest: 
@@ -190,18 +185,17 @@ class naivebayes(classifier):
         # print highest
         best_class=cat
     # print class_probs, best_class
+    if '3' in class_probs and 'postitive' in class_probs:
+      temp['postitive'] = class_probs['postitive'] + class_probs['3']
+    if '1' in class_probs and 'negative' in class_probs:
+      temp['negative'] = class_probs['negative'] +class_probs['1']
+    if '2' in class_probs and 'neutral' in class_probs:
+      temp['neutral'] = class_probs['neutral'] +class_probs['2']
     ideal = ['negative','neutral','postitive']
-    print class_probs
     for item in ideal:
         if total > 0:
-            class_probs[item] = (class_probs.get(item,0)+1)/(total+self.totalvocab())
-    # for key in class_probs.keys():
-    if '3' in class_probs and 'postitive' in class_probs:
-      temp['postitive'] = class_probs['postitive'] * class_probs['3']
-    if '1' in class_probs and 'negative' in class_probs:
-      temp['negative'] = class_probs['negative'] * class_probs['1']
-    if '2' in class_probs and 'neutral' in class_probs:
-      temp['neutral'] = class_probs['neutral'] * class_probs['2']
+            temp[item] = (temp.get(item,0)+1)/(total+self.totalvocab())
+    
     return best_class, temp
 
 
@@ -308,7 +302,7 @@ def predict_sentiment(cl, statement, brand_id):
   pr = {}
   for cat in cl.categories():
     pr[cat] = (cl.catcount(cat)+1)/(cl.totalcount()+cl.totalvocab())
-  used_probs['priors']=rename_keys(pr.copy())
+  used_probs['priors']=normalize_values(rename_keys(pr.copy()))
   print "using brand"
   print used_probs
   print probs
@@ -375,11 +369,11 @@ def predict_sentiment(cl, statement, brand_id):
     # for k,v in probs.items():
     #   probs[k] = v/tot
     # print probs, 'last'
-    used_probs['posteriors'] = rename_keys(probs)
+    used_probs['posteriors'] = normalize_values(rename_keys(probs))
     return max(probs.iteritems(), key=operator.itemgetter(1))[0], used_probs
 
   else:
-    used_probs['posteriors'] = rename_keys(probs)
+    used_probs['posteriors'] = normalize_values(rename_keys(probs))
     return classed, used_probs
 
 
@@ -390,6 +384,13 @@ def test(value, expected):
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1] in ALLOWED_EXTENSIONS
+
+def normalize_values(probs):
+  temp = {}
+  total = sum(probs.values())
+  for k in probs.keys():
+    temp[k] = probs[k]/float(total)
+  return temp
 
 def get_sent(sent):
   cl = naivebayes(getwords)
@@ -407,8 +408,8 @@ def get_sent(sent):
     pr = {}
     for cat in cl.categories():
       pr[cat] = cl.catcount(cat)/cl.totalcount()
-      probs['priors' ]= rename_keys(pr.copy())
-    probs['posteriors'] = rename_keys(p)
+      probs['priors' ]= normalize_values(rename_keys(pr.copy()))
+    probs['posteriors'] = normalize_values(rename_keys(p))
   cl.train(sent,cat)
   probs['statement'] = sent
   best = max(probs['posteriors'].iteritems(), key=operator.itemgetter(1))[0]
@@ -420,6 +421,9 @@ def to_percent(dct):
   for k,v in dct.items():
     dct[k] = v*100
   return dct
+
+
+
 
 def plot(item,i):
   figure(i, figsize=(8,8))
