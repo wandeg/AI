@@ -142,14 +142,14 @@ class classifier:
     return basicprob
 
   def initialize_brands(self):
-  self.con=sqlite.connect(dbfile)
-  self.con.execute('create table if not exists brands(name,postitive,negative,moderate)')
-  for k,v in MAPPER.items():
+    self.con=sqlite.connect(dbfile)
+    self.con.execute('create table if not exists brands(name,postitive,negative,moderate)')
+    for k,v in MAPPER.items():
       data.append({'brand':k, 'classprefs':to_percent(FEATPROBS[v]['classpreference'])})
 
-  for item in data:
-    self.con.execute("insert into brands values (%s,%s,%s,%s)" 
-      %(item['brand'],item['classprefs']['3'],item['classprefs']['1'],item['classprefs']['2']))
+    for item in data:
+      self.con.execute("insert into brands values (%s,%s,%s,%s)" 
+        %(item['brand'],item['classprefs']['3'],item['classprefs']['1'],item['classprefs']['2']))
 
 
 class naivebayes(classifier):
@@ -425,18 +425,21 @@ def to_percent(dct):
 
 
 
-def plot(item,i):
+def plot(item,i=0, key='classprefs',brand=None):
   figure(i, figsize=(8,8))
-  its = sorted(item['classprefs'].items(),key=lambda x:x[0])
-  # print its
-  fracs=[int(i[1]) for i in its]
+  its = sorted(item[key].items(),key=lambda x:x[0])
+  print its,'its'
+  fracs=[i[1]for i in its]
+  print fracs
   mylabels=['good', 'bad', 'moderate']
 
   mycolors=['green','red','blue']
-  pie(fracs,labels=mylabels,colors=mycolors,autopct='%.2f')
+  pie(fracs,labels=mylabels,colors=mycolors,autopct='%.4f')
   # print [item['brand'],fracs,mylabels,mycolors]
   title(item['brand'])
   savefig(item['brand'])
+  # title(brand)
+  # savefig(brand)
 
 @app.route('/postsent', methods=['POST'])
 def postSentiment():
@@ -460,16 +463,17 @@ def postSentiment():
       sent = request.form.get('sent')
       if sent:
         a = get_sent(sent)
+        plot(a,key='posteriors')
         ans.append(a)
     # print ans
     data=[]
-    for k,v in MAPPER.items():
-      data.append({'brand':k, 'classprefs':to_percent(FEATPROBS[v]['classpreference'])})
-    # print data
-    i=1
-    for item in data:
-      plot(item,i)
-      i+=1
+    # for k,v in MAPPER.items():
+    #   data.append({'brand':k, 'classprefs':to_percent(FEATPROBS[v]['classpreference'])})
+    # # print data
+    # i=1
+    # for item in data:
+    #   plot(item,i)
+    #   i+=1
       
   return render_template('output.html', output = ans, datas=data)
 
